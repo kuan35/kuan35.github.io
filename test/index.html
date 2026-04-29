@@ -1,5 +1,107 @@
 <!DOCTYPE html>
-<html>
-<head><title>Web3 Test</title></head>
-<body><h1>Coming soon</h1></body>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelloWorld 合約測試</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.15.0/ethers.umd.min.js" type="application/javascript"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #333; margin-bottom: 24px; }
+        h2 { color: #555; font-size: 1em; margin-bottom: 8px; }
+        .container { background: #fff; max-width: 560px; margin: 0 auto; padding: 28px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+        button { padding: 10px 16px; width: 100%; background: #4f46e5; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95em; margin-top: 8px; }
+        button:disabled { background: #a5b4fc; cursor: not-allowed; }
+        button:hover:not(:disabled) { background: #4338ca; }
+        input { padding: 10px; width: 100%; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95em; margin-top: 4px; }
+        #messageOutput { background: #f9fafb; padding: 12px; border-radius: 8px; font-size: 1.05em; color: #111; margin-top: 8px; min-height: 40px; }
+        #output { background: #1e1e2e; color: #cdd6f4; padding: 14px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em; min-height: 80px; margin-top: 8px; }
+        .note { color: #9ca3af; font-size: 0.82em; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <h1>HelloWorld 合約測試</h1>
+    <div class="container">
+        <h2>當前訊息</h2>
+        <pre id="messageOutput">請先連接錢包以讀取訊息。</pre>
+        <button id="connectBtn">連接 MetaMask</button>
+
+        <hr>
+
+        <h2>更新訊息</h2>
+        <input type="text" id="newMessageInput" placeholder="輸入新的訊息..." />
+        <button id="updateBtn" disabled>更新訊息</button>
+        <p class="note">此操作會發送交易並支付少量 Gas 費用（Sepolia 測試幣）。</p>
+
+        <hr>
+
+        <h2>交易日誌</h2>
+        <pre id="output">日誌會顯示在這裡。</pre>
+    </div>
+
+    <script>
+        const CONTRACT_ADDRESS = "YOUR_CONTRACT_ADDRESS";
+        const CONTRACT_ABI = [
+            { "inputs": [], "name": "message", "outputs": [{ "internalType": "string", "name": "", "type": "string" }], "stateMutability": "view", "type": "function" },
+            { "inputs": [{ "internalType": "string", "name": "_newMessage", "type": "string" }], "name": "updateMessage", "outputs": [], "stateMutability": "nonpayable", "type": "function" }
+        ];
+
+        const connectBtn = document.getElementById("connectBtn");
+        const updateBtn = document.getElementById("updateBtn");
+        const messageOutput = document.getElementById("messageOutput");
+        const newMessageInput = document.getElementById("newMessageInput");
+        const output = document.getElementById("output");
+        let provider, signer, contract, readOnlyContract;
+
+        function log(msg) {
+            output.textContent += msg + "\n";
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function connectWallet() {
+            try {
+                if (!window.ethereum) { log("請安裝 MetaMask"); return; }
+                log("正在請求連接 MetaMask...");
+                await window.ethereum.request({ method: "eth_requestAccounts" });
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                readOnlyContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+                log("成功連接！錢包地址: " + await signer.getAddress());
+                connectBtn.textContent = "已連接";
+                connectBtn.disabled = true;
+                updateBtn.disabled = false;
+                await getMessage();
+            } catch (e) { log("連接失敗: " + e.message); }
+        }
+
+        async function getMessage() {
+            try {
+                const msg = await readOnlyContract.message();
+                messageOutput.textContent = '"' + msg + '"';
+                log("成功讀取當前訊息。");
+            } catch (e) { log("讀取失敗: " + e.message); }
+        }
+
+        async function updateMessage() {
+            try {
+                const newMsg = newMessageInput.value;
+                if (!newMsg) { log("請輸入訊息"); return; }
+                log('發送交易，更新為: "' + newMsg + '"');
+                const tx = await contract.updateMessage(newMsg);
+                log("交易 Hash: " + tx.hash);
+                log("等待確認...");
+                await tx.wait();
+                log("交易確認完畢！");
+                await getMessage();
+            } catch (e) { log("交易失敗: " + e.message); }
+        }
+
+        connectBtn.addEventListener("click", connectWallet);
+        updateBtn.addEventListener("click", updateMessage);
+        document.addEventListener("DOMContentLoaded", () => { log("請點擊『連接 MetaMask』開始。"); });
+    </script>
+</body>
 </html>
